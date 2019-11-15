@@ -33,20 +33,44 @@ let private run (args:Args) =
 
 module MediaQuery =
     open FSharp.Data
+    open FSharp.Data.Runtime
 
     type TagCollection =
         | AllTags
         | NamedTags of string seq
     
+    type Tags = Map<string,string>
+
+    [<Literal>]
+    let TagSourceFile = "SourceFile"
+
     type MediaResult = {
-        fileName: string
         sourceFile: System.IO.FileInfo
-        tags: Map<string,string>
+        tags: Tags
     }
 
     type MediaQueryResult =
         | MediaQueryFailure of exitCode: int * errorMessage: string
         | MediaQuerySuccess of MediaResult seq
+
+    let private jsonValueToString jsonValue =
+        let useNoneForNullOrEmpty = true        
+        jsonValue 
+        |> JsonConversions.AsString useNoneForNullOrEmpty System.Globalization.CultureInfo.InvariantCulture
+        |> function
+            | Some str -> str
+            | None -> System.String.Empty
+
+    let private jsonValueToTags jsonValue =
+        jsonValue
+        |> JsonExtensions.Properties
+        |> Seq.fold (fun (tags:Tags) (tagName, value) -> 
+            tags |> Map.add tagName (value |> jsonValueToString)) Map.empty
+
+    let private tagsToMediaResult (tags: Tags) = {
+        sourceFile = tags.[TagSourceFile] |> System.IO.FileInfo
+        tags = tags
+    }                
 
     let private run args mediaPath = 
         let result = 
@@ -57,13 +81,11 @@ module MediaQuery =
         | ExiftoolFailure (exitCode, errorMessage) -> 
             MediaQueryFailure (exitCode, errorMessage)
         | ExiftoolSuccess (out, err) -> 
-            let results = JsonExtensions.Properties(JsonValue.Parse out)
-            // we need to treat the out json as a sequence of objects!
-            let record = 
-                results 
-                |> Seq.fold (fun (map:Map<string,string>) (property, value) -> 
-                    map.Add(property, JsonExtensions.AsString(value))) Map.empty
-            MediaQuerySuccess (JsonValue.Parse out)
+            out
+            |> JsonValue.Parse
+            |> JsonExtensions.AsArray
+            |> Seq.map (jsonValueToTags >> tagsToMediaResult)
+            |> MediaQuerySuccess
 
     let queryMediaTags tags mediaPath =
         let tagArguments =

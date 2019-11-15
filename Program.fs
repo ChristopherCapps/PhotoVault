@@ -1,7 +1,5 @@
 ﻿// Learn more about F# at http://fsharp.org
 
-open FSharp.Data
-open FSharp.Data.JsonExtensions
 open Exiftool.MediaQuery
 
 let printResults results =
@@ -13,9 +11,8 @@ let printResults results =
             printfn "%A" result
 
 [<EntryPoint>]
-let main argv =    
-    queryMediaTags AllTags "Testing/data"
-    |> printResults
-    queryMediaTags (NamedTags ["FileName"; "FileModifyDate"]) "Testing/data"
+let main argv =
+    if Array.length argv < 1 then failwith "A path or filename must be provided."
+    queryMediaTags (NamedTags (Array.tail argv)) argv.[0]
     |> printResults
     0
