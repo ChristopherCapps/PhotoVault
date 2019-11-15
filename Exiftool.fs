@@ -1,58 +1,74 @@
 module Exiftool
 
 open Fake.Core
-open FSharp.Data
-open FSharp.Data.JsonExtensions
 
 [<Literal>]
-let EnvExiftoolPath = "EXIFTOOL_PATH"
+let ExiftoolPathEnvVar = "EXIFTOOL_PATH"
 [<Literal>]
-let DefaultExiftoolPath = "exiftool"
+let DefaultExiftoolExePath = "exiftool"
 
 [<Literal>]
 let private JsonOutputFlag = "-json"
 
-let private ExiftoolPath = 
-    Environment.environVarOrDefault EnvExiftoolPath DefaultExiftoolPath
+let private exePath = 
+    Environment.environVarOrDefault ExiftoolPathEnvVar DefaultExiftoolExePath
 
-type ExiftoolArgs = string seq
+type Args = string seq
 
 type private ExiftoolResult = 
-    | Failure of exitCode: int * errorMessage: string
-    | Success of output: string * error: string
+    | ExiftoolFailure of exitCode: int * errorMessage: string
+    | ExiftoolSuccess of output: string * error: string
 
-type TagCollection =
-    | AllTags
-    | NamedTags of string seq
-
-let private runExiftool (args:ExiftoolArgs) =
+let private run (args:Args) =
     let result = 
-        CreateProcess.fromRawCommand ExiftoolPath args
+        CreateProcess.fromRawCommand exePath args
         |> CreateProcess.redirectOutput
         |> Proc.run
 
     match result.ExitCode with
     | 0 -> 
-        Success(result.Result.Output, result.Result.Error)
+        ExiftoolSuccess(result.Result.Output, result.Result.Error)
     | error -> 
-        Failure(error, result.Result.Error)
+        ExiftoolFailure(error, result.Result.Error)
 
-type MediaQueryResult =
-    | Failure of exitCode: int * errorMessage: string
-    | Success of JsonValue
+module MediaQuery =
+    open FSharp.Data
 
-let private mediaQuery args mediaPath = 
-    seq { yield mediaPath; yield JsonOutputFlag; yield! args }
-    |> runExiftool 
+    type TagCollection =
+        | AllTags
+        | NamedTags of string seq
+    
+    type MediaResult = {
+        fileName: string
+        sourceFile: System.IO.FileInfo
+        tags: Map<string,string>
+    }
 
-let getMediaTags tags mediaPath =
-    let tagArguments =
-        match tags with
-        | AllTags -> []
-        | NamedTags tags -> Seq.toList tags
+    type MediaQueryResult =
+        | MediaQueryFailure of exitCode: int * errorMessage: string
+        | MediaQuerySuccess of MediaResult seq
 
-    let result = runExiftool (List.append [mediaPath; JsonOutputFlag] tagArguments)
+    let private run args mediaPath = 
+        let result = 
+            seq { yield mediaPath; yield JsonOutputFlag; yield! args }
+            |> run 
 
-    match result with 
-    | ExiftoolResult.Failure (exitCode, errorMessage) -> Failure (exitCode, errorMessage)
-    | ExiftoolResult.Success (out, err) ->  Success (JsonValue.Parse out)
+        match result with 
+        | ExiftoolFailure (exitCode, errorMessage) -> 
+            MediaQueryFailure (exitCode, errorMessage)
+        | ExiftoolSuccess (out, err) -> 
+            let results = JsonExtensions.Properties(JsonValue.Parse out)
+            // we need to treat the out json as a sequence of objects!
+            let record = 
+                results 
+                |> Seq.fold (fun (map:Map<string,string>) (property, value) -> 
+                    map.Add(property, JsonExtensions.AsString(value))) Map.empty
+            MediaQuerySuccess (JsonValue.Parse out)
+
+    let queryMediaTags tags mediaPath =
+        let tagArguments =
+            match tags with
+            | AllTags -> []
+            | NamedTags tags -> Seq.toList tags |> List.map ((+) "-")
+
+        run tagArguments mediaPath

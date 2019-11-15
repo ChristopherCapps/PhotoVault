@@ -1,21 +1,21 @@
 ﻿// Learn more about F# at http://fsharp.org
 
-open System
-open Fake.Core
-open Fake.Core.CreateProcess
 open FSharp.Data
 open FSharp.Data.JsonExtensions
+open Exiftool.MediaQuery
 
-open Exiftool
+let printResults results =
+    match results with
+    | MediaQueryFailure (exitCode, errorMessage) ->
+        printfn "Error: %d; %s" exitCode errorMessage
+    | MediaQuerySuccess json -> 
+        for result in json do        
+            printfn "%A" result
 
 [<EntryPoint>]
-let main argv =
-    let results = getMediaTags AllTags "/Users/capps/Downloads/Photos"
-    match results with
-    | Failure (exitCode, errorMessage) ->
-        printfn "Error: %d; %s" exitCode errorMessage
-        exitCode
-    | Success json -> 
-        for photo in json do        
-            printfn "File: %A DTO: %A" photo?FileName photo?FileModifyDate
-        0
+let main argv =    
+    queryMediaTags AllTags "Testing/data"
+    |> printResults
+    queryMediaTags (NamedTags ["FileName"; "FileModifyDate"]) "Testing/data"
+    |> printResults
+    0
