@@ -1,6 +1,6 @@
 ﻿// Learn more about F# at http://fsharp.org
 
-open Exiftool.MediaQuery
+open Exiftool.Media
 
 let printResults results =
     match results with

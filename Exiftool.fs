@@ -31,7 +31,7 @@ let private run (args:Args) =
     | error -> 
         ExiftoolFailure(error, result.Result.Error)
 
-module MediaQuery =
+module Media =
     open FSharp.Data
     open FSharp.Data.Runtime
 
@@ -44,8 +44,23 @@ module MediaQuery =
     [<Literal>]
     let TagSourceFile = "SourceFile"
 
+    let private imageTypes = [ "jpg"; "jpeg"; "heic"; "png" ]
+    let private videoTypes = [ "avi"; "mov"; "mpg"; "mp4"; "mpeg" ]
+        
+    type MediaFormat = 
+        | Image of string
+        | Video of string
+        | Unknown of string
+
+    let private getMediaType (file:System.IO.FileInfo) =
+        let ext = file.Extension.ToLower()
+        if imageTypes |> List.contains ext then Image(ext)
+        else if videoTypes |> List.contains ext then Video(ext)
+        else Unknown(ext)
+
     type MediaResult = {
         sourceFile: System.IO.FileInfo
+        mediaFormat: MediaFormat
         tags: Tags
     }
 
@@ -67,10 +82,13 @@ module MediaQuery =
         |> Seq.fold (fun (tags:Tags) (tagName, value) -> 
             tags |> Map.add tagName (value |> jsonValueToString)) Map.empty
 
-    let private tagsToMediaResult (tags: Tags) = {
-        sourceFile = tags.[TagSourceFile] |> System.IO.FileInfo
-        tags = tags
-    }                
+    let private tagsToMediaResult (tags: Tags) = 
+        let sourceFile' = tags.[TagSourceFile] |> System.IO.FileInfo
+        { 
+            sourceFile = sourceFile'
+            tags = tags
+            mediaFormat = getMediaType sourceFile'
+        }                
 
     let private run args mediaPath = 
         let result = 
