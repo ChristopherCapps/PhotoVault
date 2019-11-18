@@ -32,4 +32,5 @@ let getPreferredTimestampTag media =
 let private calculateMD5Hash media =
     use md5 = System.Security.Cryptography.MD5.Create()
     use stream = System.IO.File.OpenRead(media.sourceFile.FullName)
-    System.BitConverter.ToString(md5.ComputeHash(stream)).Replace("-",System.String.Empty);
+    System.BitConverter.ToString(md5.ComputeHash(stream)).Replace("-", System.String.Empty);
+
