@@ -1,6 +1,7 @@
 ﻿// Learn more about F# at http://fsharp.org
 
 open Exiftool.Media
+open Settings
 
 let printResults results =
     match results with
@@ -12,7 +13,15 @@ let printResults results =
 
 [<EntryPoint>]
 let main argv =
-    if Array.length argv < 1 then failwith "A path or filename must be provided."
-    queryMediaTags (NamedTags (Array.tail argv)) argv.[0]
-    |> printResults
+    let results = CLI.parser.Parse argv
+    printfn "%A" (CLI.parser.PrintUsage())
+    printfn "%A" results
+    let settings = { 
+        path = "/tmp/"
+        indexFile = "/tmp/repository.idx" 
+    }
+    //printfn "%s" (serialize [settings; settings; settings])
+    // if Array.length argv < 1 then failwith "A path or filename must be provided."
+    // queryMediaTags (NamedTags (Array.tail argv)) argv.[0]
+    // |> printResults
     0

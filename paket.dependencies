@@ -1,3 +1,5 @@
 source https://api.nuget.org/v3/index.json
+nuget Argu
 nuget Fake.Core.Process
 nuget FSharp.Data
+nuget Newtonsoft.Json
